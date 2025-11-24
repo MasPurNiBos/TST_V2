@@ -12,7 +12,7 @@ from st_supabase_connection import SupabaseConnection
 # 1. CONFIG & THEME (WIDE MODE)
 # ==========================================
 st.set_page_config(
-    page_title="TST - Issue Tracker",
+    page_title="TST V2 - Testing Issue Tracker",
     page_icon="assets/logo.svg",
     layout="wide",
     initial_sidebar_state="expanded"
