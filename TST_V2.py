@@ -13,7 +13,7 @@ from st_supabase_connection import SupabaseConnection
 # ==========================================
 st.set_page_config(
     page_title="TST - Issue Tracker",
-    page_icon="assets/Logo.svg",
+    page_icon="assets/logo.svg",
     layout="wide",
     initial_sidebar_state="expanded"
 )
