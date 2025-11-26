@@ -6,6 +6,7 @@ import time
 import base64
 import io
 import re
+import uuid 
 from st_supabase_connection import SupabaseConnection
 
 # ==========================================
@@ -23,8 +24,9 @@ st.set_page_config(
 # ==========================================
 def get_base64_image(image_path):
     try:
-        with open(image_path, "r", encoding="utf-8") as f:
-            return base64.b64encode(f.read().encode("utf-8")).decode("utf-8")
+        # Asumsi assets ada di folder lokal
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
     except:
         return ""
 
@@ -56,6 +58,28 @@ try:
 except:
     st.error("Gagal konek Supabase. Cek secrets.toml")
     st.stop()
+
+# --- FUNGSI UPLOAD GAMBAR (FIXED: menggunakan .client dan lowercase 'evidence') ---
+def upload_evidence(file_obj):
+    if file_obj:
+        try:
+            file_ext = file_obj.name.split('.')[-1]
+            file_name = f"{uuid.uuid4()}.{file_ext}"
+            
+            # PENTING: Gunakan conn.client.storage dan ID bucket 'evidence' (lowercase)
+            conn.client.storage.from_("evidence").upload(
+                path=file_name,
+                file=file_obj.getvalue(),
+                file_options={"content-type": file_obj.type}
+            )
+            
+            # PENTING: Gunakan conn.client.storage
+            public_url = conn.client.storage.from_("evidence").get_public_url(file_name)
+            return public_url
+        except Exception as e:
+            st.error(f"Upload failed: {e}")
+            return None
+    return None
 
 def login_user(username, password):
     try:
@@ -130,6 +154,16 @@ st.markdown("""
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
     [data-testid="stHeader"] {background-color: rgba(0,0,0,0);}
+    
+    /* CUSTOM ALIGNMENT FIX */
+    .stFileUploader {
+        /* Mengatur agar file uploader tidak terlalu tebal ke atas */
+        padding-top: 0px !important;
+        margin-top: 0px !important;
+    }
+    .stFileUploader > label {
+        display: none !important; /* Hilangkan label asli */
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -167,6 +201,9 @@ else:
 
     issues_data = conn.table("issues").select("*").execute()
     all_issues = issues_data.data if issues_data.data else []
+    
+    # KATEGORI BARU
+    CATEGORY_OPTIONS = ['Frontend (UI/UX)', 'Backend Logic', 'Database/Schema', 'Configuration/Deployment', 'Testing Environment']
 
     # --- MODAL DETAIL ---
     @st.dialog("Issue Detail", width="large")
@@ -180,25 +217,31 @@ else:
 
         c1, c2 = st.columns([3, 1])
         with c1:
-            st.subheader(f"{issue_data['id']}")
-            st.caption(f"{issue_data['description']}")
+            st.subheader(f"{issue_data['id']} - {issue_data.get('category', '-')}")
+            st.caption(f"Project: **{issue_data['project']}** | Reporter: **{issue_data['reporter']}**")
         with c2:
-            if issue_data['status']: st.success("RESOLVED")
-            else: st.error("OPEN")
+            if issue_data['status']: 
+                st.success(f"RESOLVED by {issue_data.get('resolved_by', 'Unknown')}")
+            else: 
+                st.error("OPEN")
 
         st.markdown("---")
+        st.write(f"**Description:** {issue_data['description']}")
+        st.write(f"**Expected/Remarks:** {issue_data.get('remarks', '-')}")
+
         col_left, col_right = st.columns([1, 1.5])
 
-        # EVIDENCE (DISABLED FOR NOW)
+        # EVIDENCE SECTION 
         with col_left:
             with st.container(border=True):
                 render_header("Image.svg", "Evidence", size=20)
-                # Tampilkan gambar kalau ada (manual DB insert), tapi upload dimatiin dulu
+                
                 existing_img = issue_data.get('evidence')
                 if existing_img:
-                    st.image(existing_img, caption="Evidence", use_container_width=True)
+                    st.image(existing_img, caption="Bukti Screenshot", use_container_width=True)
+                    st.markdown(f"[Buka Gambar Full]({existing_img})")
                 else:
-                    st.info("📷 Image upload feature: Not implemented yet.")
+                    st.info("No screenshot attached.")
 
         # DISCUSSION (LIVE)
         with col_right:
@@ -235,7 +278,7 @@ else:
     # --- SIDEBAR ---
     with st.sidebar:
         render_header("Logo.svg", "TST v2", size=32)
-        st.caption(f"Logged in as: {st.session_state.user.get('full_name', 'User')}")
+        st.caption(f"Logged in as: {st.session_state.user.get('fullname', st.session_state.user.get('username'))}")
 
         if st.button("Logout", use_container_width=True):
             st.session_state.user = None
@@ -253,7 +296,7 @@ else:
                     conn.table("projects").insert({"name": np}).execute()
                     st.rerun()
 
-        # DELETE PROJECT (NEW FEATURE)
+        # DELETE PROJECT
         with st.popover("🗑️ Delete Project", use_container_width=True):
             st.warning("Hati-hati! Menghapus project tidak menghapus isunya (tapi hidden).")
             del_proj = st.selectbox("Select to Delete", ["-- Select --"] + projects_list)
@@ -275,6 +318,16 @@ else:
                 st.download_button("Export Excel", data=buf, file_name="TST_Full.xlsx", use_container_width=True)
         else:
             st.button("Export Excel", disabled=True, use_container_width=True)
+        
+        # DEBUG CHECK BUCKET (opsional, untuk memastikan nama bucket)
+        with st.expander("🕵️ Debug Storage"):
+            try:
+                buckets = conn.client.storage.list_buckets()
+                st.write("Bucket yang ditemukan:")
+                for b in buckets:
+                    st.code(f"Name: {b.name} | ID: {b.id}")
+            except Exception as e:
+                st.error(f"Error: Cek secrets.toml atau client access: {e}")
 
     # --- MAIN CONTENT ---
     if st.session_state.active_ticket_id:
@@ -311,23 +364,59 @@ else:
 
         st.markdown("---")
 
-        # QUICK ADD TO DB
+        # --- QUICK ADD DENGAN ALIGNMENT FIX & CATEGORY ---
         with st.container(border=True):
             render_header("Add.svg", "Quick Add Issue", size=20)
-            c_desc, c_rem, c_sev, c_btn = st.columns([3, 2, 1, 1], gap="small")
+            
+            # Row 1: Description dan Remarks
+            c_desc, c_rem = st.columns([3, 2])
             with c_desc: desc_in = st.text_input("Desc", label_visibility="collapsed", placeholder="Bug description...")
-            with c_rem: rem_in = st.text_input("Rem", label_visibility="collapsed", placeholder="Expected...")
-            with c_sev: sev_in = st.selectbox("Sev", ["Low", "Medium", "High", "Critical"], label_visibility="collapsed")
-            with c_btn:
-                if st.button("Add", use_container_width=True):
+            with c_rem: rem_in = st.text_input("Rem", label_visibility="collapsed", placeholder="Expected behavior...")
+            
+            # Row 2: Severity dan Category (Select Boxes)
+            c_sev, c_cat, c_placeholder = st.columns([1, 1, 3], vertical_alignment="bottom")
+            with c_sev: 
+                sev_in = st.selectbox("Severity", ["Low", "Medium", "High", "Critical"], label_visibility="collapsed")
+            with c_cat: 
+                cat_in = st.selectbox("Category", CATEGORY_OPTIONS, label_visibility="collapsed")
+            
+            # Row 3: Uploader dan Button
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True) # Spacer
+            c_up_btn, c_submit = st.columns([4, 1], vertical_alignment="bottom")
+            
+            with c_up_btn:
+                # File Uploader
+                uploaded_file = st.file_uploader("Evidence", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed")
+                
+            with c_submit:
+                if st.button("Submit Issue", use_container_width=True, type="primary"):
                     if desc_in:
-                        new_id = f"#T-{len(all_issues)+1:03d}"
-                        conn.table("issues").insert({
-                            "id": new_id, "project": selected_nav, "description": desc_in, "remarks": rem_in,
-                            "severity": sev_in, "status": False, "time_found": get_wib_time(), "time_resolved": "-",
-                            "reporter": st.session_state.user['username'], "comments": []
-                        }).execute()
-                        st.rerun()
+                        with st.spinner("Submitting..."):
+                            # 1. Handle Upload
+                            evidence_url = None
+                            if uploaded_file:
+                                evidence_url = upload_evidence(uploaded_file)
+                            
+                            # 2. Insert DB
+                            new_id = f"#T-{len(all_issues)+1:03d}"
+                            conn.table("issues").insert({
+                                "id": new_id, 
+                                "project": selected_nav, 
+                                "description": desc_in, 
+                                "remarks": rem_in,
+                                "severity": sev_in, 
+                                "category": cat_in, # <--- FIELD BARU MASUK SINI
+                                "status": False, 
+                                "time_found": get_wib_time(), 
+                                "time_resolved": "-",
+                                "reporter": st.session_state.user['username'], 
+                                "comments": [],
+                                "evidence": evidence_url 
+                            }).execute()
+                            
+                            st.success("Issue Created!")
+                            time.sleep(0.5)
+                            st.rerun()
 
         st.write("")
 
@@ -337,7 +426,8 @@ else:
             df = pd.DataFrame(filtered_issues)
             df['delete'] = False
             df = df.rename(columns={'description': 'desc'})
-            df_display = df[['delete', 'status', 'id', 'time_found', 'desc', 'remarks', 'severity', 'time_resolved']]
+            # Tambah Category ke kolom display
+            df_display = df[['delete', 'status', 'id', 'time_found', 'desc', 'remarks', 'category', 'severity', 'time_resolved']]
 
             res = st.data_editor(
                 df_display,
@@ -347,6 +437,9 @@ else:
                     "id": st.column_config.TextColumn("ID", width="small", disabled=True),
                     "desc": st.column_config.TextColumn("Description", width="large"),
                     "remarks": st.column_config.TextColumn("Remarks", width="medium"),
+                    # EDITABLE DROPDOWN UNTUK CATEGORY
+                    "category": st.column_config.SelectboxColumn("Category", options=CATEGORY_OPTIONS, required=True), 
+                    "severity": st.column_config.SelectboxColumn("Severity", options=["Low", "Medium", "High", "Critical"], required=True),
                     "time_found": st.column_config.TextColumn("Found", disabled=True, width="small"),
                     "time_resolved": st.column_config.TextColumn("Resolved", disabled=True, width="small"),
                 },
@@ -366,12 +459,24 @@ else:
                         break
 
                     updates = {}
+                    
+                    # SILENT AUDITOR & STATUS LOGIC
+                    if row['status'] != orig_row['status']:
+                        updates['status'] = row['status']
+                        if row['status'] == True:
+                            updates['time_resolved'] = get_wib_time()
+                            updates['resolved_by'] = st.session_state.user['username']
+                        else:
+                            updates['time_resolved'] = "-"
+                            updates['resolved_by'] = None
+
+                    # Update field lain
                     if row['desc'] != orig_row['desc']: updates['description'] = row['desc']
                     if row['remarks'] != orig_row['remarks']: updates['remarks'] = row['remarks']
                     if row['severity'] != orig_row['severity']: updates['severity'] = row['severity']
-                    if row['status'] != orig_row['status']:
-                        updates['status'] = row['status']
-                        updates['time_resolved'] = get_wib_time() if row['status'] else "-"
+                    
+                    # UPDATE CATEGORY
+                    if row['category'] != orig_row['category']: updates['category'] = row['category']
 
                     if updates:
                         conn.table("issues").update(updates).eq("id", issue_id).execute()
@@ -380,7 +485,8 @@ else:
             st.write("")
             st.markdown("---")
             render_header("Detail.svg", "Details", size=20)
-            opts = ["-- Select --"] + [f"{i['id']} - {i['description']}" for i in filtered_issues]
+            # Pastikan opts mengambil category juga
+            opts = ["-- Select --"] + [f"{i['id']} - {i.get('category', 'No Category')} - {i['description']}" for i in filtered_issues]
             sel = st.selectbox("Select", opts, label_visibility="collapsed")
             if st.button("View Detail", use_container_width=True, type="primary"):
                 if sel != "-- Select --":
