@@ -289,23 +289,28 @@ else:
         selected_nav = st.selectbox("Project", project_options, label_visibility="collapsed")
 
         # ADD PROJECT
-        with st.popover("➕ Add Project", use_container_width=True):
+        with st.popover("Add Project", use_container_width=True):
+            render_header("AddProject.svg", "Add New Project", size=20)
+
             np = st.text_input("New Project Name")
-            if st.button("Create Project"):
+            if st.button("Create Project", use_container_width=True):
                 if np and np not in projects_list:
                     conn.table("projects").insert({"name": np}).execute()
                     st.rerun()
 
         # DELETE PROJECT
-        with st.popover("🗑️ Delete Project", use_container_width=True):
-            st.warning("Hati-hati! Menghapus project tidak menghapus isunya (tapi hidden).")
+        with st.popover("Delete Project", use_container_width=True):
+            render_header("delete.svg", "Delete Project", size=20)
+
             del_proj = st.selectbox("Select to Delete", ["-- Select --"] + projects_list)
-            if st.button("Confirm Delete"):
+
+            if st.button("Confirm Delete", use_container_width=True):
                 if del_proj != "-- Select --":
                     conn.table("projects").delete().eq("name", del_proj).execute()
                     st.toast(f"Project {del_proj} deleted!", icon="🗑️")
                     time.sleep(1)
                     st.rerun()
+
 
         st.markdown("---")
         # Export Logic
