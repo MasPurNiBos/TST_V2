@@ -45,39 +45,39 @@ def get_wib_time():
     tz = pytz.timezone('Asia/Jakarta')
     return datetime.now(tz).strftime("%d/%m %H:%M")
 
-# --- CUSTOM NOTIFICATION (TOP CENTER) ---
+# --- CUSTOM NOTIFICATION (FIXED FOR HOSTING) ---
 def show_notification(message, type="success"):
-    """
-    Menampilkan notifikasi floating di tengah atas.
-    """
-    color = "#10B981" if type == "success" else "#EF4444" # Hijau / Merah
-    icon = "✅" if type == "success" else "⚠️"
+    clean_type = type.lower().strip()
+    color = "#10B981" if clean_type == "success" else "#EF4444"
+    icon = "✅" if clean_type == "success" else "⚠️"
     
     st.markdown(f"""
         <style>
             @keyframes slideDownFade {{
-                0% {{ top: -50px; opacity: 0; }}
-                10% {{ top: 20px; opacity: 1; }}
-                90% {{ top: 20px; opacity: 1; }}
-                100% {{ top: -50px; opacity: 0; }}
+                0% {{ top: -100px; opacity: 0; }}
+                10% {{ top: 30px; opacity: 1; }} 
+                90% {{ top: 30px; opacity: 1; }}
+                100% {{ top: -100px; opacity: 0; }}
             }}
             .floating-notif {{
                 position: fixed;
-                top: -50px;
+                top: -100px;
                 left: 50%;
                 transform: translateX(-50%);
-                z-index: 99999;
+                z-index: 999999;
                 background-color: {color};
                 color: white;
                 padding: 12px 24px;
                 border-radius: 50px;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.4);
                 font-weight: 600;
                 display: flex;
                 align-items: center;
-                gap: 10px;
+                gap: 12px;
+                font-size: 16px;
                 animation: slideDownFade 4s ease-in-out forwards;
                 pointer-events: none;
+                white-space: nowrap;
             }}
         </style>
         <div class="floating-notif">
@@ -165,8 +165,14 @@ st.markdown("""
     [data-testid="stDataFrame"] { border: 1px solid #334155; border-radius: 8px; }
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} .stAppDeployButton {display: none;}
     [data-testid="stHeader"] {background-color: rgba(0,0,0,0);}
+    
+    /* CSS FIX UNTUK ALIGNMENT TOMBOL & UPLOADER */
     .stFileUploader { padding-top: 0px !important; margin-top: 0px !important; }
     .stFileUploader > label { display: none !important; }
+    div[data-testid="column"] > div > div > div > div > .stButton {
+        padding-top: 23px !important; /* Menyamakan tinggi dengan uploader */
+    }
+    
 </style>
 """, unsafe_allow_html=True)
 
@@ -192,7 +198,7 @@ if st.session_state.user is None:
                         user = login_user(u, p)
                         if user:
                             st.session_state.user = user
-                            st.query_params["u"] = user['username'] # Simpan session di URL
+                            st.query_params["u"] = user['username']
                             st.rerun()
                         else:
                             show_notification("Invalid Username or Password", "error")
@@ -206,7 +212,7 @@ else:
     issues_data = conn.table("issues").select("*").execute()
     all_issues = issues_data.data if issues_data.data else []
     
-    CATEGORY_OPTIONS = ['Frontend (UI/UX)', 'Backend Logic', 'Database/Schema', 'Configuration/Deployment', 'Testing Environment']
+    CATEGORY_OPTIONS = ['UI/UX Defect', 'Functional Bug', 'Data Integrity', 'Feature Request', 'Performance', 'Others']
 
     # --- MODAL DETAIL ---
     @st.dialog("Issue Detail", width="large")
@@ -223,7 +229,7 @@ else:
             st.caption(f"Project: **{issue_data['project']}** | Reporter: **{issue_data['reporter']}**")
         with c2:
             if issue_data['status']: st.success(f"RESOLVED by {issue_data.get('resolved_by', 'Unknown')}")
-            else: st.error("OPEN")
+            else: st.error("PENDING")
 
         st.markdown("---")
         st.write(f"**Description:** {issue_data['description']}")
@@ -235,8 +241,8 @@ else:
                 render_header("Image.svg", "Evidence", size=20)
                 existing_img = issue_data.get('evidence')
                 if existing_img:
-                    st.image(existing_img, caption="Bukti Screenshot", use_container_width=True)
-                    st.markdown(f"[Buka Gambar Full]({existing_img})")
+                    st.image(existing_img, caption="Evidence Image", use_container_width=True)
+                    st.markdown(f"[Open Full Image]({existing_img})")
                 else: st.info("No screenshot.")
 
         with col_right:
@@ -269,7 +275,7 @@ else:
 
         if st.button("Logout", use_container_width=True):
             st.session_state.user = None
-            st.query_params.clear() # Clear URL Params
+            st.query_params.clear()
             st.rerun()
 
         st.markdown("---")
@@ -296,8 +302,9 @@ else:
             if st.button("Confirm Delete", use_container_width=True):
                 if del_proj != "-- Select --":
                     with st.spinner("Deleting..."):
-                        conn.table("issues").delete().eq("project", del_proj).execute() # Hapus Issue Dulu
-                        conn.table("projects").delete().eq("name", del_proj).execute()  # Hapus Project
+                        conn.table("issues").delete().eq("project", del_proj).execute() 
+                        conn.table("projects").delete().eq("name", del_proj).execute()  
+                    
                     st.session_state.notification_queue = (f"Project '{del_proj}' & issues deleted!", "success")
                     st.rerun()
 
@@ -308,16 +315,9 @@ else:
                 buf = io.BytesIO()
                 with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
                     df_all.to_excel(writer, index=False, sheet_name="Backup")
-                st.download_button("Export Excel", data=buf, file_name="TST_Full.xlsx", use_container_width=True)
+                st.download_button("Export to Excel", data=buf, file_name="TST_Full.xlsx", use_container_width=True)
         else:
-            st.button("Export Excel", disabled=True, use_container_width=True)
-        
-        with st.expander("🕵️ Debug Storage"):
-            try:
-                buckets = conn.client.storage.list_buckets()
-                st.write("Bucket yang ditemukan:")
-                for b in buckets: st.code(f"Name: {b.name} | ID: {b.id}")
-            except Exception as e: st.error(f"Error: {e}")
+            st.button("Export to Excel", disabled=True, use_container_width=True)
 
     # --- MAIN CONTENT ---
     if st.session_state.active_ticket_id:
@@ -336,7 +336,7 @@ else:
         with m3:
             with st.container(border=True): st.metric("Resolved", len([i for i in filtered_issues if i['status']]))
         with m4:
-            with st.container(border=True): st.metric("High Sev", len([i for i in filtered_issues if i['severity'] in ["High", "Critical"] and not i['status']]))
+            with st.container(border=True): st.metric("High Severity", len([i for i in filtered_issues if i['severity'] in ["High"] and not i['status']]))
 
         st.write("")
         st.info("Select a project from the sidebar to manage issues.")
@@ -354,23 +354,26 @@ else:
 
         st.markdown("---")
 
-        # --- QUICK ADD ---
+        # --- QUICK ADD (Layout Dirapikan) ---
         with st.container(border=True):
             render_header("Add.svg", "Quick Add Issue", size=20)
             
-            c_desc, c_rem = st.columns([3, 2])
+            # Baris 1: Desc & Remarks (Seimbang 1:1)
+            c_desc, c_rem = st.columns([1, 1]) 
             with c_desc: desc_in = st.text_input("Desc", label_visibility="collapsed", placeholder="Bug description...")
             with c_rem: rem_in = st.text_input("Rem", label_visibility="collapsed", placeholder="Expected behavior...")
             
-            c_sev, c_cat, c_placeholder = st.columns([1, 1, 3], vertical_alignment="bottom")
-            with c_sev: sev_in = st.selectbox("Severity", ["Low", "Medium", "High", "Critical"], label_visibility="collapsed")
+            # Baris 2: Severity & Category (Seimbang 1:1)
+            c_sev, c_cat = st.columns([1, 1])
+            with c_sev: sev_in = st.selectbox("Severity", ["Low", "Medium", "High"], label_visibility="collapsed")
             with c_cat: cat_in = st.selectbox("Category", CATEGORY_OPTIONS, label_visibility="collapsed")
             
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-            c_up_btn, c_submit = st.columns([4, 1], vertical_alignment="bottom")
-            
-            with c_up_btn: uploaded_file = st.file_uploader("Evidence", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed")
+            # Baris 3: Uploader & Tombol (Sejajar)
+            c_up_btn, c_submit = st.columns([4, 1], vertical_alignment="center")
+            with c_up_btn: 
+                uploaded_file = st.file_uploader("Evidence", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed")
             with c_submit:
+                # Tombol akan otomatis sejajar karena vertical_alignment="bottom" dan trik CSS
                 if st.button("Submit Issue", use_container_width=True, type="primary"):
                     if desc_in:
                         with st.spinner("Submitting..."):
@@ -394,7 +397,6 @@ else:
             df['delete'] = False
             df = df.rename(columns={'description': 'desc'})
             
-            # Handle empty category for old data
             if 'category' not in df.columns:
                 df['category'] = 'Backend Logic'
 
