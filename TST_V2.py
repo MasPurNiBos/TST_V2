@@ -375,36 +375,75 @@ else:
             with c_submit:
                 if st.button("Submit Issue", use_container_width=True, type="primary"):
                     if desc_in:
-                        with st.spinner("Submitting..."):
-                            # --- LOGIKA ID BARU (PREFIX PROJECT) ---
-                            # 1. Buat Prefix dari 3 huruf pertama nama project (Huruf Besar)
-                            # Contoh: "Website Revamp" -> "WEB"
-                            # Jika nama project pendek/simbol, ambil seadanya.
-                            clean_proj_name = "".join(filter(str.isalpha, selected_nav)) # Hapus spasi/simbol
-                            prefix = (clean_proj_name[:3] if len(clean_proj_name) >= 3 else clean_proj_name).upper()
+                        with st.spinner("Processing..."):
                             
-                            # Jika prefix kosong (misal nama project angka semua), pakai "PRJ"
-                            if not prefix: prefix = "PRJ"
-
-                            # 2. Ambil issue hanya di project ini untuk cari nomor terakhir
-                            current_project_issues = [i for i in all_issues if i['project'] == selected_nav]
+                            # --- 1. SMART PREFIX GENERATION ---
+                            # Tujuannya: Memastikan Prefix Project ini UNIK dan KONSISTEN
                             
-                            max_id_num = 0
-                            for issue in current_project_issues:
+                            current_proj = selected_nav
+                            chosen_prefix = None
+                            
+                            # A. Cek apakah project ini sudah punya issue sebelumnya?
+                            # Kita cari issue apapun dari project ini untuk mencontek prefix-nya
+                            existing_issue = next((i for i in all_issues if i['project'] == current_proj), None)
+                            
+                            if existing_issue:
+                                # Jika ada, gunakan prefix yang sudah ada (Contoh: "BAC-005" -> ambil "BAC")
                                 try:
-                                    # Format ID: "XXX-001" -> Ambil angka setelah tanda strip "-" terakhir
-                                    id_parts = issue['id'].split("-")
-                                    num_part = int(id_parts[-1]) # Ambil bagian paling belakang
-                                    if num_part > max_id_num:
-                                        max_id_num = num_part
+                                    chosen_prefix = existing_issue['id'].split('-')[0]
                                 except:
-                                    pass 
-                            
-                            # 3. Gabungkan Prefix + Nomor Baru
-                            new_id = f"{prefix}-{max_id_num + 1:03d}"
-                            # Hasil: WEB-001, WEB-002, dst.
-                            # -------------------------------------
+                                    pass # Fallback jika format lama rusak
 
+                            # B. Jika belum ada (Project Baru), kita cari Prefix yang belum terpakai
+                            if not chosen_prefix:
+                                # Kumpulkan semua prefix yang SUDAH dipakai oleh project LAIN
+                                used_prefixes = set()
+                                for i in all_issues:
+                                    if i['project'] != current_proj: # Abaikan project sendiri
+                                        try:
+                                            pid = i['id'].split('-')[0]
+                                            used_prefixes.add(pid)
+                                        except: pass
+                                
+                                # Coba Strategi 1: 3 Huruf Pertama (BACkend -> BAC)
+                                clean_name = "".join(filter(str.isalpha, current_proj)).upper()
+                                candidate_1 = clean_name[:3] if len(clean_name) >=3 else clean_name.ljust(3, 'X')
+                                
+                                # Coba Strategi 2: Huruf Awal + Tengah + Akhir (BACkend -> B + E + D = BED)
+                                mid_idx = len(clean_name) // 2
+                                candidate_2 = (clean_name[0] + clean_name[mid_idx] + clean_name[-1]) if len(clean_name) >= 3 else candidate_1
+                                
+                                # Coba Strategi 3: 4 Huruf Pertama (BACK)
+                                candidate_3 = clean_name[:4] if len(clean_name) >=4 else candidate_1 + "X"
+
+                                # LOGIKA PEMILIHAN (Anti Bentrok)
+                                if candidate_1 not in used_prefixes:
+                                    chosen_prefix = candidate_1
+                                elif candidate_2 not in used_prefixes:
+                                    chosen_prefix = candidate_2
+                                elif candidate_3 not in used_prefixes:
+                                    chosen_prefix = candidate_3
+                                else:
+                                    # Jalan terakhir: Pakai Random/UUID pendek jika semua mirip
+                                    chosen_prefix = f"{candidate_1}X"
+
+                            # --- 2. GENERATE NOMOR URUT ---
+                            # Filter issue hanya untuk project & prefix ini
+                            project_issues = [i for i in all_issues if i['project'] == current_proj]
+                            
+                            max_num = 0
+                            for issue in project_issues:
+                                try:
+                                    # Parse ID: "BAC-001" -> 1
+                                    curr_prefix, curr_num = issue['id'].split('-')
+                                    if curr_prefix == chosen_prefix: # Pastikan prefix sama
+                                        if int(curr_num) > max_num:
+                                            max_num = int(curr_num)
+                                except: pass
+                            
+                            new_id = f"{chosen_prefix}-{max_num + 1:03d}"
+                            
+                            # --- 3. EKSEKUSI INSERT ---
                             evidence_url = upload_evidence(uploaded_file)
                             
                             try:
@@ -425,10 +464,9 @@ else:
                                 
                                 st.session_state.notification_queue = (f"Issue Created! ({new_id})", "success")
                                 st.rerun()
-                                
+
                             except Exception as e:
-                                # Tampilkan error detail jika masih gagal
-                                st.error(f"Error saving to DB: {e}")
+                                st.error(f"Gagal menyimpan (ID Conflict): {e}")
 
         st.write("")
 
