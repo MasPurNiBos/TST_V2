@@ -1,0 +1,25 @@
+Timestamp,Step,Status,Message
+14:32:20,Buka Web,PROCESS,Otw localhost:8501...
+14:32:44,CRITICAL ERROR,FAIL,"Message: 
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x7ff7fd2ba235
+	0x7ff7fd012630
+	0x7ff7fcda16dd
+	0x7ff7fcdfa27e
+	0x7ff7fcdfa58c
+	0x7ff7fce4ed77
+	0x7ff7fce4baba
+	0x7ff7fcdeb0ed
+	0x7ff7fcdebf63
+	0x7ff7fd2e5d60
+	0x7ff7fd2dfe8a
+	0x7ff7fd301005
+	0x7ff7fd02d71e
+	0x7ff7fd034e1f
+	0x7ff7fd01b7c4
+	0x7ff7fd01b97f
+	0x7ff7fd0018e8
+	0x7ffe63e3e8d7
+	0x7ffe64f2c53c
+"

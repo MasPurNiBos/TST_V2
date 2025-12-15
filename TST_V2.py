@@ -373,19 +373,46 @@ else:
             with c_up_btn: 
                 uploaded_file = st.file_uploader("Evidence", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed")
             with c_submit:
-                # Tombol akan otomatis sejajar karena vertical_alignment="bottom" dan trik CSS
                 if st.button("Submit Issue", use_container_width=True, type="primary"):
                     if desc_in:
                         with st.spinner("Submitting..."):
+                            # --- LOGIKA ID BARU (DIPERBAIKI) ---
+                            # 1. Ambil semua issue hanya untuk project ini
+                            current_project_issues = [i for i in all_issues if i['project'] == selected_nav]
+                            
+                            # 2. Cari angka ID tertinggi yang sudah ada (misal #T-005, ambil 5)
+                            max_id_num = 0
+                            for issue in current_project_issues:
+                                try:
+                                    # Format ID: "#T-XXX", kita ambil angka setelah "#T-"
+                                    id_num = int(issue['id'].replace("#T-", ""))
+                                    if id_num > max_id_num:
+                                        max_id_num = id_num
+                                except:
+                                    pass # Abaikan jika ada format ID lama yang error
+                            
+                            # 3. ID Baru = Angka Tertinggi + 1
+                            new_id = f"#T-{max_id_num + 1:03d}"
+                            # -------------------------------------
+
                             evidence_url = upload_evidence(uploaded_file)
-                            new_id = f"#T-{len(all_issues)+1:03d}"
+                            
                             conn.table("issues").insert({
-                                "id": new_id, "project": selected_nav, "description": desc_in, "remarks": rem_in,
-                                "severity": sev_in, "category": cat_in, "status": False, "time_found": get_wib_time(),
-                                "time_resolved": "-", "reporter": st.session_state.user['username'], "comments": [], "evidence": evidence_url 
+                                "id": new_id, 
+                                "project": selected_nav, 
+                                "description": desc_in, 
+                                "remarks": rem_in,
+                                "severity": sev_in, 
+                                "category": cat_in, 
+                                "status": False, 
+                                "time_found": get_wib_time(),
+                                "time_resolved": "-", 
+                                "reporter": st.session_state.user['username'], 
+                                "comments": [], 
+                                "evidence": evidence_url 
                             }).execute()
                             
-                            st.session_state.notification_queue = ("Issue Created!", "success")
+                            st.session_state.notification_queue = (f"Issue Created! ({new_id})", "success")
                             st.rerun()
 
         st.write("")
