@@ -376,44 +376,59 @@ else:
                 if st.button("Submit Issue", use_container_width=True, type="primary"):
                     if desc_in:
                         with st.spinner("Submitting..."):
-                            # --- LOGIKA ID BARU (DIPERBAIKI) ---
-                            # 1. Ambil semua issue hanya untuk project ini
+                            # --- LOGIKA ID BARU (PREFIX PROJECT) ---
+                            # 1. Buat Prefix dari 3 huruf pertama nama project (Huruf Besar)
+                            # Contoh: "Website Revamp" -> "WEB"
+                            # Jika nama project pendek/simbol, ambil seadanya.
+                            clean_proj_name = "".join(filter(str.isalpha, selected_nav)) # Hapus spasi/simbol
+                            prefix = (clean_proj_name[:3] if len(clean_proj_name) >= 3 else clean_proj_name).upper()
+                            
+                            # Jika prefix kosong (misal nama project angka semua), pakai "PRJ"
+                            if not prefix: prefix = "PRJ"
+
+                            # 2. Ambil issue hanya di project ini untuk cari nomor terakhir
                             current_project_issues = [i for i in all_issues if i['project'] == selected_nav]
                             
-                            # 2. Cari angka ID tertinggi yang sudah ada (misal #T-005, ambil 5)
                             max_id_num = 0
                             for issue in current_project_issues:
                                 try:
-                                    # Format ID: "#T-XXX", kita ambil angka setelah "#T-"
-                                    id_num = int(issue['id'].replace("#T-", ""))
-                                    if id_num > max_id_num:
-                                        max_id_num = id_num
+                                    # Format ID: "XXX-001" -> Ambil angka setelah tanda strip "-" terakhir
+                                    id_parts = issue['id'].split("-")
+                                    num_part = int(id_parts[-1]) # Ambil bagian paling belakang
+                                    if num_part > max_id_num:
+                                        max_id_num = num_part
                                 except:
-                                    pass # Abaikan jika ada format ID lama yang error
+                                    pass 
                             
-                            # 3. ID Baru = Angka Tertinggi + 1
-                            new_id = f"#T-{max_id_num + 1:03d}"
+                            # 3. Gabungkan Prefix + Nomor Baru
+                            new_id = f"{prefix}-{max_id_num + 1:03d}"
+                            # Hasil: WEB-001, WEB-002, dst.
                             # -------------------------------------
 
                             evidence_url = upload_evidence(uploaded_file)
                             
-                            conn.table("issues").insert({
-                                "id": new_id, 
-                                "project": selected_nav, 
-                                "description": desc_in, 
-                                "remarks": rem_in,
-                                "severity": sev_in, 
-                                "category": cat_in, 
-                                "status": False, 
-                                "time_found": get_wib_time(),
-                                "time_resolved": "-", 
-                                "reporter": st.session_state.user['username'], 
-                                "comments": [], 
-                                "evidence": evidence_url 
-                            }).execute()
-                            
-                            st.session_state.notification_queue = (f"Issue Created! ({new_id})", "success")
-                            st.rerun()
+                            try:
+                                conn.table("issues").insert({
+                                    "id": new_id, 
+                                    "project": selected_nav, 
+                                    "description": desc_in, 
+                                    "remarks": rem_in,
+                                    "severity": sev_in, 
+                                    "category": cat_in, 
+                                    "status": False, 
+                                    "time_found": get_wib_time(),
+                                    "time_resolved": "-", 
+                                    "reporter": st.session_state.user['username'], 
+                                    "comments": [], 
+                                    "evidence": evidence_url 
+                                }).execute()
+                                
+                                st.session_state.notification_queue = (f"Issue Created! ({new_id})", "success")
+                                st.rerun()
+                                
+                            except Exception as e:
+                                # Tampilkan error detail jika masih gagal
+                                st.error(f"Error saving to DB: {e}")
 
         st.write("")
 
