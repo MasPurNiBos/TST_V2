@@ -14,7 +14,7 @@ from st_supabase_connection import SupabaseConnection
 # ==========================================
 st.set_page_config(
     page_title="Issue Tracking Center",
-    page_icon="assets/logo.svg",
+    page_icon="assets/LogoHeader.svg",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -187,7 +187,7 @@ if st.session_state.user is None:
 
     with c_center:
         with st.container(border=True):
-            st.markdown("<h1 style='text-align: center;'>🔐 TST Login</h1>", unsafe_allow_html=True)
+            st.markdown("<h1 style='text-align: center;'>LOGIN to i-TRAC</h1>", unsafe_allow_html=True)
 
             u = st.text_input("Username")
             p = st.text_input("Password", type="password")
@@ -268,9 +268,22 @@ else:
                             st.session_state.active_ticket_id = issue_id
                             st.rerun()
 
-    # --- SIDEBAR ---
+# --- SIDEBAR ---
     with st.sidebar:
-        render_header("logo.svg", "Issue Tracking Center", size=32)
+        logo_b64 = get_base64_image("assets/logo.svg")
+        
+        if logo_b64:
+            st.markdown(f"""
+            <div style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 25px;">
+                <img src="data:image/svg+xml;base64,{logo_b64}" width="160" style="margin-bottom: 15px; border-radius: 10px;">
+                <span style="font-size: 20px; font-weight: 500; color: #FFFFFF; letter-spacing: 1px;">Issue Tracking Center</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            # Fallback jika gambar tidak ketemu
+            st.title("Issue Tracking Center")
+
+        # --- INFO USER ---
         st.caption(f"Logged in as: {st.session_state.user.get('fullname', st.session_state.user.get('username'))}")
 
         if st.button("Logout", use_container_width=True):
@@ -279,6 +292,8 @@ else:
             st.rerun()
 
         st.markdown("---")
+        
+        # --- NAVIGASI PROJECT ---
         project_options = ["All Projects (Dashboard)"] + projects_list
         selected_nav = st.selectbox("Project", project_options, label_visibility="collapsed")
 
