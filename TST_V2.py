@@ -13,7 +13,7 @@ from st_supabase_connection import SupabaseConnection
 # 1. CONFIG & THEME (WIDE MODE)
 # ==========================================
 st.set_page_config(
-    page_title="TST V2 - Testing Issue Tracker",
+    page_title="Issue Tracking Center",
     page_icon="assets/logo.svg",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -238,7 +238,7 @@ else:
         col_left, col_right = st.columns([1, 1.5])
         with col_left:
             with st.container(border=True):
-                render_header("Image.svg", "Evidence", size=20)
+                render_header("image.svg", "Evidence", size=20)
                 existing_img = issue_data.get('evidence')
                 if existing_img:
                     st.image(existing_img, caption="Evidence Image", use_container_width=True)
@@ -247,7 +247,7 @@ else:
 
         with col_right:
             with st.container(border=True):
-                render_header("Chat.svg", "Discussion", size=20)
+                render_header("chat.svg", "Discussion", size=20)
                 comments = issue_data.get('comments', []) or []
                 chat_container = st.container(height=300)
                 with chat_container:
@@ -270,7 +270,7 @@ else:
 
     # --- SIDEBAR ---
     with st.sidebar:
-        render_header("Logo.svg", "TST v2", size=32)
+        render_header("logo.svg", "Issue Tracking Center", size=32)
         st.caption(f"Logged in as: {st.session_state.user.get('fullname', st.session_state.user.get('username'))}")
 
         if st.button("Logout", use_container_width=True):
@@ -325,7 +325,7 @@ else:
         st.session_state.active_ticket_id = None
 
     if selected_nav == "All Projects (Dashboard)":
-        render_header("Dashboard.svg", "Global Dashboard", size=28)
+        render_header("dashboard.svg", "Global Dashboard", size=28)
         filtered_issues = all_issues
 
         m1, m2, m3, m4 = st.columns(4)
@@ -344,7 +344,7 @@ else:
     else:
         # PROJECT VIEW
         filtered_issues = [i for i in all_issues if i['project'] == selected_nav]
-        render_header("Project.svg", selected_nav, size=28)
+        render_header("project.svg", selected_nav, size=28)
 
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total", len(filtered_issues))
@@ -356,7 +356,7 @@ else:
 
         # --- QUICK ADD (Layout Dirapikan) ---
         with st.container(border=True):
-            render_header("Add.svg", "Quick Add Issue", size=20)
+            render_header("add.svg", "Quick Add Issue", size=20)
             
             # Baris 1: Desc & Remarks (Seimbang 1:1)
             c_desc, c_rem = st.columns([1, 1]) 
@@ -533,7 +533,7 @@ else:
             # --- VIEW DETAIL SECTION (FIXED POSITION) ---
             st.write("")
             st.markdown("---")
-            render_header("Detail.svg", "Details", size=20)
+            render_header("detail.svg", "Details", size=20)
             
             opts = ["-- Select --"] + [f"{i['id']} - {i.get('category', 'No Category')} - {i['description']}" for i in filtered_issues]
             sel = st.selectbox("Select", opts, label_visibility="collapsed")
